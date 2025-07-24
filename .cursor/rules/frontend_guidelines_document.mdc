@@ -1,0 +1,170 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Frontend Guideline Document
+
+This document explains how we build and style the user interface for DShield-SIEM. It is written in everyday terms so that anyone—technical or non-technical—can understand how the frontend is organized, why we made the choices we did, and how to maintain and extend it.
+
+## 1. Frontend Architecture
+
+### 1.1 Overview
+
+*   **Kibana as the UI platform**: The entire user interface lives inside Kibana, which is a React-based web application. We build custom features and dashboards as Kibana plugins.
+*   **Elastic UI Framework (EUI)**: We rely on EUI, Elastic’s open-source design library of React components, to ensure a consistent look and feel and to speed up development.
+*   **Plugin Structure**: Each feature—whether a dashboard, a custom visualization, or an alert-management screen—is packaged as its own plugin. Plugins are loaded on demand, keeping the initial load fast.
+
+### 1.2 Scalability, Maintainability, Performance
+
+*   **Scalability**: By splitting features into separate plugins, teams can work in parallel and add new capabilities without touching the core code. Plugins can be deployed or updated independently.
+*   **Maintainability**: Reusing EUI components and following a common project structure (see Component Structure) makes it easy for anyone to find, fix, or extend code.
+*   **Performance**: Kibana only loads the code for the active plugin. We use lazy loading (React `lazy` and `Suspense`) so large visualizations or charts are fetched when needed, reducing initial page weight.
+
+## 2. Design Principles
+
+Our frontend follows these guiding principles:
+
+### 2.1 Usability
+
+*   **Clear layouts**: Dashboards and pages are laid out in logical sections—charts grouped by topic, a navigation panel on the left, primary actions in the header.
+*   **Consistent patterns**: Filters, time pickers, and search bars always look and behave the same.
+
+### 2.2 Accessibility
+
+*   **Keyboard navigation**: All interactive elements (buttons, links, tables) can be reached with the keyboard.
+*   **ARIA labels**: Important UI elements include ARIA attributes so screen readers can describe them properly.
+*   **Contrast ratios**: Color choices meet WCAG AA contrast guidelines for readable text and icons.
+
+### 2.3 Responsiveness
+
+*   **Flexible grids**: Dashboards adapt to different screen sizes—two-column layouts on desktop, single-column on tablets or smaller.
+*   **Touch support**: Controls and charts work smoothly on touch devices.
+
+## 3. Styling and Theming
+
+### 3.1 Styling Approach
+
+*   **CSS-in-JS with Emotion**: EUI uses Emotion behind the scenes. We write styles as JavaScript objects alongside our React components.
+*   **BEM-inspired class names**: When adding custom classes, we follow a simple Block__Element–Modifier pattern to avoid conflicts.
+
+### 3.2 Theming
+
+*   **Light and Dark modes**: Kibana supports both out of the box. We use the Elastic theme provider so our custom components switch colors automatically when the user toggles the theme.
+
+### 3.3 Visual Style
+
+*   **Flat design**: We stick to a clean, flat look—no heavy shadows or skeuomorphic elements. This matches the Elastic design language.
+*   **Glassmorphism accents**: In select overview cards, we use subtle glass-like backgrounds (semi-transparent panels with slight blur) to highlight key metrics.
+
+### 3.4 Color Palette
+
+Our color palette builds on the official Elastic brand:\
+• Primary blue: #0052CC\
+• Secondary teal: #00B8D9\
+• Success green: #36B37E\
+• Warning yellow: #FFAB00\
+• Danger red: #FF5630\
+• Background white: #FFFFFF\
+• Background dark: #1E1E1E\
+• Text: #172B4D (dark mode text: #FFFFFF)
+
+### 3.5 Typography
+
+*   **Font**: We use Inter, the default Kibana font. It is clean and highly legible.
+*   **Hierarchy**: Headings use heavier weights and larger sizes, body text is regular weight. All sizes follow a defined scale (e.g., 12px, 14px, 16px, 20px).
+
+## 4. Component Structure
+
+### 4.1 Organization
+
+*   **src/plugins/**: Each plugin has its own folder under `src/plugins/<pluginName>`.
+*   **components/**: Shared React components (tables, filters, headers) live in `src/plugins/common/components`.
+*   **hooks/**: Custom React hooks (e.g., `useTimeFilter`, `useFetchAlerts`) are in `src/plugins/common/hooks`.
+*   **services/**: API client logic and data-fetching code (`src/plugins/common/services`).
+
+### 4.2 Reusability
+
+*   **EUI components first**: If a standard EUI component exists (e.g., `EuiButton`, `EuiTable`), we use it rather than creating a new one.
+*   **Shared components**: For dashboards, filters, and visualizations that appear in more than one place, we wrap them in shared components under `common/components`.
+
+### 4.3 Benefits
+
+*   **Consistent behavior**: Users see the same controls everywhere.
+*   **Simplified updates**: Fixing or enhancing a shared component automatically improves every page that uses it.
+
+## 5. State Management
+
+### 5.1 Approach
+
+*   **Redux Toolkit**: We use Redux Toolkit for global state (e.g., active time range, current dashboard ID). It simplifies reducers and actions.
+*   **React Context**: For plugin-specific settings (e.g., table pagination, column visibility), we use React Context to avoid prop drilling.
+*   **Local component state**: UI details like opening a popover or toggling a modal are handled with local `useState`.
+
+### 5.2 Data Flow
+
+1.  **User action** (e.g., selects a new time range)
+2.  **Dispatch Redux action** (`setTimeRange`)
+3.  **Middleware/Thunk** fetches data from Elasticsearch
+4.  **Reducers** update the store with new results
+5.  **UI components** subscribe to the store and re-render with fresh data
+
+This clear separation ensures predictable updates and makes debugging state issues easy.
+
+## 6. Routing and Navigation
+
+### 6.1 Routing
+
+*   **React Router**: Kibana’s core uses a custom router built on top of React Router. Plugins register their routes in `public/plugin.ts` under a `router` section.
+*   **Route definitions**: Each plugin declares its base path (e.g., `/app/dshield-siem/overview`) and child routes for detailed views.
+
+### 6.2 Navigation Structure
+
+*   **Side navigation**: The left-hand menu shows top-level links (Overview, Dashboards, Alerts, Settings).
+*   **Breadcrumbs**: We use Kibana’s Breadcrumb service so users always know where they are and can click back to higher-level pages.
+*   **Header actions**: The top bar contains global controls—time picker, user menu, and quick link to documentation.
+
+## 7. Performance Optimization
+
+*   **Lazy loading**: We wrap plugin pages with `React.lazy` so code and bundles only download when users navigate there.
+*   **Code splitting**: Webpack splits large libraries and vendor code into separate bundles.
+*   **Memoization**: Components that render large tables or charts use `React.memo` or `useMemo` to avoid unnecessary re-renders.
+*   **Batching requests**: When fetching multiple visualizations at once, we combine API calls to Elasticsearch instead of making separate requests.
+*   **Asset optimization**: Images and icons are served as SVGs. We compress any custom images and leverage Kibana’s static asset pipeline.
+
+These optimizations keep the UI snappy, even when visualizing thousands of events.
+
+## 8. Testing and Quality Assurance
+
+### 8.1 Unit Tests
+
+*   **Jest**: We write unit tests for React components (snapshots, behavior) and utility functions.
+*   **Testing Library (React)**: To test user interactions (clicks, typing) and DOM output.
+
+### 8.2 Integration Tests
+
+*   **Kibana plugin functional tests**: Using Mocha and Kibana’s functional test runner to spin up a test server and verify routes, API responses, and basic UI flows.
+
+### 8.3 End-to-End Tests
+
+*   **Cypress**: Simulate real user scenarios—logging in, changing time range, triggering an alert, drilling into a chart.
+*   **Continuous Integration**: E2E tests run automatically on every pull request to catch regressions early.
+
+### 8.4 Code Quality
+
+*   **ESLint & Prettier**: Enforce consistent code style and catch common errors before commit.
+*   **TypeScript**: Type annotations in plugin code help prevent bugs and improve editor auto-completion.
+
+## 9. Conclusion and Overall Frontend Summary
+
+Our frontend for DShield-SIEM is built atop Kibana’s React platform, structured as independent plugins that use Elastic’s own design system (EUI) and standard web practices. We emphasize:
+
+*   Scalability through plugin architecture
+*   Consistency and speed with reusable components and EUI
+*   Accessibility and responsiveness for all users
+*   Performance via lazy loading, memoization, and batched requests
+*   Robust testing to maintain quality over time
+
+Together, these guidelines ensure that any new feature or improvement can slot into the existing system smoothly, remain easy to maintain, and deliver a fast, user-friendly experience for security analysts.

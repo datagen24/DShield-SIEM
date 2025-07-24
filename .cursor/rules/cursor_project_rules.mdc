@@ -1,0 +1,179 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+## Project Overview
+
+*   **Type:** cursor_project_rules
+*   **Description:** A comprehensive SIEM solution built on the Elastic Stack for collecting, processing, enriching, storing, and visualizing security logs from DShield sensors and other sources, enabling advanced threat detection and response.
+*   **Primary Goal:** To establish a robust Security Information and Event Management (SIEM) system capable of collecting, processing, analyzing, and visualizing security-related logs from DShield sensors to enhance threat detection and response capabilities.
+
+## Project Structure
+
+### Framework-Specific Routing
+
+*   **Directory Rules:**
+
+    *   Not applicable – this is a backend data pipeline project without frontend routing frameworks.
+
+### Core Directories
+
+*   **Versioned Structure:**
+
+    *   `config/`: Configuration files for Elasticsearch, Logstash, Kibana, Filebeat, Metricbeat, Heartbeat, Elastic Agent
+    *   `pipelines/`: Logstash pipeline definitions (e.g., `logstash-200-filter-cowrie.conf`)
+    *   `dashboards/`: Kibana saved objects in NDJSON (dashboards, visualizations, index patterns)
+    *   `scripts/`: Setup and maintenance scripts (`cowrie-setup.sh`, `get_iscipintel.sh`, `change_perms.sh`)
+    *   `docker/`: `docker-compose.yml` and Dockerfiles for each Elastic Stack component
+    *   `add-ons/`: Markdown guides for optional integrations (Arkime, Zeek sensor tuning, packet capture)
+    *   `docs/`: Architecture diagrams, README, installation and troubleshooting guides
+    *   `metrics/`: `cursor_metrics.md` for rules usage tracking
+
+### Key Files
+
+*   **Stack-Versioned Patterns:**
+
+    *   `docker-compose.yml`: Docker Compose orchestration for Elastic Stack v8.x
+    *   `config/elasticsearch.yml`: Elasticsearch node configuration and ILM settings
+    *   `config/logstash.yml` & `pipelines.yml`: Logstash master config directing to pipeline folder
+    *   `pipelines/logstash-*.conf`: Versioned pipeline filters for Cowrie, iptables, Zeek, webhoneypot
+    *   `config/filebeat.yml`, `metricbeat.yml`, `heartbeat.yml`, `elastic-agent.yml`: Beats configurations with TLS and index targets
+    *   `dashboards/dshield_dashboards.ndjson`: Kibana v8.x saved objects export
+    *   `scripts/*.sh`: Bash scripts with `set -euo pipefail`, argument parsing, logging
+
+## Tech Stack Rules
+
+*   **Version Enforcement:**
+
+    *   `elasticsearch@8.x`: Enforce ECS mapping, ILM, no deprecated types
+    *   `logstash@8.x`: Use `pipelines.yml`; split filter configs per log type; enforce ECS
+    *   `kibana@8.x`: NDJSON imports must match Kibana version; use RBAC spaces
+    *   `filebeat@8.x`: Use modules and JSON logging; secure TLS to Logstash
+    *   `metricbeat@8.x`: Disable unused modules; include host metadata
+    *   `heartbeat@8.x`: Monitor Elastic Stack services over HTTPS
+    *   `elastic-agent@8.x`: Managed via Fleet, avoid side-by-side agents
+    *   `docker@23.x` & `docker-compose@1.29.x`: Use versioned images, healthchecks, resource limits
+    *   `bash@5.x`: Use strict mode (`set -euo pipefail`), inline help
+    *   `python@3.8+`: Virtual environments, `requirements.txt`, structured logging
+    *   `YAML/JSON/NDJSON`: Validate against schemas, 2-space indentation, no tabs
+
+## PRD Compliance
+
+*   **Non-Negotiable:**
+
+    *   "Ingest diverse security logs, including those from DShield sensors (Cowrie honeypot, webhoneypot, firewall/iptables, Zeek network security monitor).": Must implement dedicated Logstash pipelines per sensor type.
+    *   "Provide comprehensive visualization and analysis capabilities through custom Kibana dashboards, including views for honeypot activity, Zeek network data, user commands, login attempts, and file activity.": All dashboards must reside in `dashboards/` and be version-controlled in NDJSON.
+    *   "Implement alerting mechanisms based on defined security rules and threat intelligence matches.": Use Kibana alerting with IOC-based and threshold-based rules defined in `dashboards/alerts.ndjson`.
+    *   "Deployment primarily uses Docker and Docker Compose for containerization and orchestration.": All services must be defined in `docker-compose.yml` with proper dependency ordering and healthchecks.
+
+## App Flow Integration
+
+*   **Stack-Aligned Flow:**
+
+    *   Log Collection → Beats (Filebeat, Metricbeat, Heartbeat, Elastic Agent) → Logstash pipelines (pipelines/*.conf) → Elasticsearch indices (ILM-enabled) → Kibana dashboards & alerts
+
+## Best Practices
+
+*   Elasticsearch
+
+    *   Model all events to Elastic Common Schema (ECS)
+    *   Use Index Lifecycle Management (ILM) policies for hot-warm-cold data
+    *   Enable TLS encryption and RBAC for all endpoints
+    *   Monitor cluster health and node resource usage
+
+*   Logstash
+
+    *   Split pipelines per log type under `pipelines/`
+    *   Precompile and test Grok patterns in isolation
+    *   Use `mutate`, `drop`, and `geoip` plugins sparingly to optimize performance
+    *   Version control pipeline configs and reload on change
+
+*   Kibana
+
+    *   Export and version-control saved objects (NDJSON)
+    *   Use Spaces for environment isolation (dev/prod)
+    *   Template dashboards with consistent naming and tags
+    *   Leverage alerting framework with email/webhook channels
+
+*   Filebeat / Metricbeat / Heartbeat / Elastic Agent
+
+    *   Use central management via Fleet when possible
+    *   Secure outputs with TLS and credentials stored in `secrets/`
+    *   Limit modules to required data sources to reduce noise
+    *   Tag events with host and deployment metadata
+
+*   Docker & Docker Compose
+
+    *   Pin image versions; avoid `latest`
+    *   Define `healthcheck` for each service
+    *   Set resource limits (CPU/memory) in Compose file
+    *   Use separate networks for internal traffic
+
+*   Bash & Python
+
+    *   Use `set -euo pipefail` in Bash scripts
+    *   Provide `--help` and usage messages
+    *   In Python, use virtualenv and log to structured files
+    *   Validate external inputs and API responses
+
+*   YAML / JSON / NDJSON
+
+    *   Lint all configs with `yamllint` and `jsonlint`
+    *   Enforce 2-space indentation and no tabs
+    *   Validate NDJSON format before import
+
+*   Threat Intelligence (ISC, Rosti, VirusTotal)
+
+    *   Cache feed results locally and respect rate limits
+    *   Rotate API keys securely and store in vault
+    *   Enrich logs asynchronously to avoid pipeline delays
+
+*   Sensors (Cowrie, webhoneypot, Zeek, iptables)
+
+    *   Enable JSON logging output where available
+    *   Map sensor fields to ECS-compliant field names
+    *   Periodically update rules and whitelists
+
+*   Add-Ons (Arkime, Lighttpd)
+
+    *   Document optional guides under `add-ons/`
+    *   Keep integration steps idempotent and scriptable
+
+*   AI-Powered Dev Tools (Claude Code, Cursor, Xcode)
+
+    *   Commit AI-generated suggestions with review
+    *   Keep plugin configs under `config/ide/`
+    *   Use consistent coding style and linting rules
+
+## Rules
+
+*   Derive folder/file patterns directly from techStackDoc versions.
+*   Place Beats configs under `config/` only; pipelines under `pipelines/`.
+*   Store dashboards, visualizations, and alert definitions in `dashboards/` as NDJSON.
+*   Scripts must live in `scripts/` and follow strict mode guidelines.
+*   Docker Compose must orchestrate all services with pinned versions and healthchecks.
+*   Never mix config types (e.g., no pipeline files in `config/`, no Beats YAML in `pipelines/`).
+
+## Rules Metrics
+
+Before starting the project development, create a metrics file in the root of the project called
+
+`cursor_metrics.md`
+
+### Instructions:
+
+*   Each time a cursor rule is used as context, update `cursor_metrics.md`.
+*   Use the following format for `cursor_metrics.md`:
+
+# Rules Metrics
+
+## Usage
+
+The number of times rules is used as context
+
+*   rule-name.mdc: 5
+*   another-rule.mdc: 2
+*   ...other rules

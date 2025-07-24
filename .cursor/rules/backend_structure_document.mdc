@@ -1,0 +1,135 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Backend Structure Document for DShield-SIEM
+
+This document outlines the backend setup for DShield-SIEM, a Security Information and Event Management (SIEM) solution built on the Elastic Stack. It explains the architecture, data storage, APIs, hosting, infrastructure, security, and maintenance in simple terms.
+
+## 1. Backend Architecture
+
+Overall, DShield-SIEM follows a modular, container-based approach that makes it easy to scale, update, and troubleshoot. Key points:
+
+• Containerized services: Each major component (Elasticsearch, Logstash, Kibana, Beats) runs in its own Docker container, isolated from one another.\
+• Data pipeline pattern: Logs flow from sensors → Beats → Logstash → Elasticsearch → Kibana. This clear pipeline means you can add more collectors or processors without affecting other parts.\
+• Loose coupling: Components communicate over well-defined interfaces (mainly HTTP/TCP), so you can swap or upgrade parts (e.g., move Logstash to a separate host) without rewriting everything.\
+• Scalability: To handle more data, you simply add more Elasticsearch nodes, more Logstash instances, or more Filebeat agents. Docker Compose makes it easy to spin up additional containers when needed.\
+• Maintainability: Configuration files and scripts live in Git, so changes are tracked and you can roll back if something breaks.\
+• Performance: Dedicated pipelines (one per log type) in Logstash reduce parsing overhead, and Elasticsearch Index Lifecycle Management (ILM) optimizes storage and search speed.
+
+## 2. Database Management
+
+DShield-SIEM uses Elasticsearch, which is a NoSQL, document-oriented database optimized for search and analytics.
+
+• Indexes instead of tables: Logs are stored in daily indices (e.g., `siem-cowrie-2024.06.15`), grouping similar events for faster queries and easier retention.\
+• Mappings define fields: Each index has a mapping that tells Elasticsearch how to interpret fields (text, keyword, date, IP, geo_point).\
+• ILM policies: Automate rollover (e.g., new index every day), warm/cold storage tiers, and deletion after retention periods (90 days hot, 180 days warm).\
+• Backups (snapshots): Periodically take snapshots of indices to a shared filesystem or cloud storage for disaster recovery.\
+• Access via REST API: The system reads and writes data through Elasticsearch’s HTTP endpoints, ensuring compatibility with many tools.
+
+## 3. Database Schema
+
+Because Elasticsearch is a document store, we define a schema per index. Here’s a human-friendly view of the main indices:
+
+Index Name: siem-cowrie-\
+• timestamp: Date and time of the event\
+• source.ip: IP address of attacker or sensor\
+• user.name: Username used in login attempt\
+• event.action: e.g., "login_success", "command_executed", "file_downloaded"\
+• cowrie.command: Shell command issued (if any)\
+• cowrie.session: Honeypot session ID\
+• file.hash: MD5 or SHA256 of downloaded file\
+• threatintel.match: Indicator from ISC, Rosti, or VirusTotal
+
+Index Name: siem-iptables-\
+• timestamp: Date/time of firewall event\
+• source.ip: Originating IP\
+• destination.ip: Target IP\
+• network.transport: Protocol (TCP/UDP)\
+• iptables.chain: e.g., INPUT, FORWARD\
+• iptables.action: e.g., ACCEPT, DROP
+
+Index Name: siem-zeek-\
+• timestamp: Date/time of network event\
+• source.ip, source.port, destination.ip, destination.port\
+• zeek.protocol: e.g., HTTP, DNS, SSL\
+• zeek.user_agent: User-agent string (for HTTP)\
+• zeek.duration: Connection time
+
+All indices share common ECS fields like `@timestamp`, `host.name`, and `geoip.location` for uniform search and visualization.
+
+## 4. API Design and Endpoints
+
+DShield-SIEM does not expose a custom application API; it relies on Elasticsearch’s REST API and Beats protocols:
+
+• Beats → Logstash input: Filebeat, Metricbeat, Heartbeat, and Elastic Agent push data over encrypted TCP (Beats protocol) to Logstash.\
+• Logstash pipelines: Defined in `.conf` files, they use input, filter, and output sections. Output sends data to Elasticsearch via HTTP bulk API.\
+• Elasticsearch endpoints:\
+– /_bulk: Bulk load of processed events\
+– /_search: Query data for visualizations and alerts\
+– /_ilm/policy: Manage index lifecycles\
+– /_snapshot: Create and restore snapshots\
+• Kibana REST API: Import/export dashboards, maps, and index patterns via NDJSON files.\
+• Threat Intel enrichment scripts: Python/Bash scripts call external APIs (e.g., VirusTotal `/file/report`) to enrich events before indexing.
+
+## 5. Hosting Solutions
+
+DShield-SIEM runs anywhere Docker and Docker Compose are available. Common deployments:
+
+• On-premises Linux servers or VMs: Install Docker, clone the repo, and run `docker-compose up -d`.\
+• Cloud-based VMs (AWS EC2, Azure VM, Google Compute Engine): Same Docker setup, with optionally larger instance types and attached block storage.\
+• Container services (AWS ECS/Fargate or Azure Container Instances): You can adapt the `docker-compose.yml` to a task definition or Azure Container Apps.
+
+Benefits: • Reliability: Containers restart automatically on failure.\
+• Scalability: Add more CPU/RAM or more container replicas.\
+• Cost-effectiveness: Pay only for the underlying VM/container resources you use.
+
+## 6. Infrastructure Components
+
+To ensure smooth operation and fast user experience, DShield-SIEM includes:
+
+• Load Balancer (optional): Distributes API calls across multiple Elasticsearch or Kibana replicas (e.g., Nginx, HAProxy, or cloud LB).\
+• Internal Caching: Elasticsearch uses in-memory caches for query results and field data.\
+• CDN (optional): If you serve static assets (e.g., a custom plugin or Lighttpd TTY logs), you can front them with a CDN for faster delivery.\
+• Storage Volumes: Docker volumes or mounted disks for Elasticsearch data and Logstash configurations.\
+• Index Lifecycle Management: Automates data tiering—hot, warm, cold—based on age and access patterns.\
+• Network Segmentation: Sensor networks are logically separated from management networks via Docker networks or cloud security groups.
+
+## 7. Security Measures
+
+Protecting security data is critical. DShield-SIEM implements:
+
+• TLS Encryption: All Beats → Logstash and Logstash → Elasticsearch traffic is encrypted using certificates.\
+• Role-Based Access Control: Elasticsearch and Kibana users have only the permissions they need (view dashboards, manage alerts, etc.).\
+• Secrets Management: Credentials and API keys are kept out of Git and injected at runtime via environment variables or a secret store (1Password, Vault).\
+• Firewall Rules: Only necessary ports (e.g., Beats input port, Elasticsearch HTTP port) are open between hosts.\
+• Audit Logging: Elasticsearch’s audit trail plug-in can log who did what and when in Kibana.\
+• Regular Updates: Docker images are rebuilt with the latest Elastic Stack patches to address vulnerabilities.
+
+## 8. Monitoring and Maintenance
+
+Keeping the SIEM healthy involves:
+
+• Metricbeat & Heartbeat: Monitor container and service health (CPU, memory, disk, uptime). Alerts can trigger on high resource usage or container crashes.\
+• Elastic Monitoring: Use the built-in Elastic Stack monitoring UI to track cluster health, index performance, and JVM stats.\
+• Automated Backups: Schedule regular snapshots of Elasticsearch indices to external storage.\
+• Logstash Pipeline Checks: On each configuration change, validate pipelines with `–config.test_and_exit` to catch errors early.\
+• Container Orchestration: Docker Compose restarts failed containers automatically; you can also integrate with a simple supervisor or Kubernetes for self-healing.\
+• Capacity Planning: Review daily ingestion rates and plan for additional nodes or increased disk size before hitting capacity limits.\
+• Patch Management: Rebuild and redeploy containers when new versions of Elastic Stack are released.
+
+## 9. Conclusion and Overall Backend Summary
+
+DShield-SIEM’s backend is a well-structured, containerized Elastic Stack setup that:
+
+• Ingests logs from honeypots, firewalls, and network monitors through Beats and Logstash.\
+• Stores and indexes data in Elasticsearch with clear ILM policies for retention and performance.\
+• Exposes everything via standard RESTful endpoints, keeping integrations simple.\
+• Runs reliably on Docker Compose, whether on-prem or in the cloud.\
+• Uses industry-standard security controls (TLS, RBAC, secrets management) to protect data.\
+• Monitors itself via Metricbeat, Heartbeat, and Elastic monitoring features, ensuring high availability.
+
+This backend design aligns perfectly with the project goal of delivering a turnkey, scalable SIEM solution that any security team can deploy, maintain, and trust without needing deep expertise in Elasticsearch or container orchestration.

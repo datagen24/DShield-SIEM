@@ -1,0 +1,137 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Tech Stack Document
+
+This document explains the technology choices behind the DShield-SIEM project in simple terms. It’s designed so anyone—technical or non-technical—can understand why each tool is used and how it fits into the overall solution.
+
+## 1. Frontend Technologies
+
+Although DShield-SIEM isn’t a traditional website or app, it provides a user interface for analysts through Kibana. Here’s how we’ve built and styled that interface:
+
+*   **Kibana**
+
+    *   The main web interface where users view dashboards, charts, maps, and tables.
+    *   Lets analysts search data, build custom visualizations, and manage alerts without writing code.
+
+*   **Kibana Query Language (KQL)**
+
+    *   A simple search syntax for filtering and finding exactly the logs you need.
+    *   Makes it easy to drill down into events by typing intuitive filters (e.g., `source.ip: "1.2.3.4"`).
+
+*   **Lighttpd (for TTY logs)**
+
+    *   A lightweight web server used in an add-on to display Cowrie honeypot terminal (TTY) logs in the browser.
+
+These tools give security analysts an interactive, user-friendly experience for exploring and visualizing security data.
+
+## 2. Backend Technologies
+
+The backend handles all data collection, processing, storage, and enrichment. It’s built around the Elastic Stack and supporting tools:
+
+*   **Elasticsearch**
+
+    *   The central database that stores and indexes every log entry for fast searching and aggregation.
+    *   Scales horizontally so you can add more capacity as data grows.
+
+*   **Logstash**
+
+    *   A server-side pipeline that receives raw logs, parses them, filters out noise, and enriches them with extra information.
+    *   Uses plugins like **Grok** (for pattern matching), **GeoIP** (to add location info), and **threat intel lookups**.
+
+*   **Filebeat, Metricbeat, Heartbeat, Elastic Agent**
+
+    *   Lightweight data shippers installed on sensors and servers:
+
+        *   **Filebeat** tails log files (Cowrie, webhoneypot, iptables).
+        *   **Metricbeat** gathers system and Docker container metrics.
+        *   **Heartbeat** checks service availability (uptime monitoring).
+        *   **Elastic Agent** can unify collection for logs, metrics, and security events.
+
+*   **Data Formats & Configurations**
+
+    *   **YAML** for configuring Beats, Logstash, and Docker Compose.
+    *   **JSON / NDJSON** for Logstash pipelines, Elasticsearch index templates, and importing Kibana dashboards.
+
+*   **Scripting & Automation**
+
+    *   **Bash scripts** automate setup tasks (certificate creation, index templates, data loading).
+    *   **Python scripts** support custom enrichment (e.g., querying VirusTotal for malware hashes).
+
+Together, these components form a pipeline that turns raw security logs into structured, searchable, and enriched documents.
+
+## 3. Infrastructure and Deployment
+
+To make deployment reliable, repeatable, and scalable, we rely on containerization and version control:
+
+*   **Docker & Docker Compose**
+
+    *   Each Elastic Stack component runs in its own Docker container for isolation and consistency.
+    *   A single `docker-compose.yml` file starts Elasticsearch, Logstash, Kibana, and Beats with one command.
+
+*   **Version Control (Git)**
+
+    *   All configurations, scripts, and dashboards are stored in a Git repository to track changes and roll back if needed.
+
+*   **Developer Tools**
+
+    *   **Claude Code**, **Cursor**, **Xcode**: AI-powered assistants and IDE plugins that help developers write and review code efficiently.
+
+*   **CI/CD Pipelines (optional)**
+
+    *   You can integrate with build systems (like GitHub Actions or Jenkins) to automatically test and deploy updates when configurations or scripts change.
+
+This setup ensures that anyone on the team can bring up a fresh instance of the SIEM with minimal manual steps.
+
+## 4. Third-Party Integrations
+
+We enrich logs by consulting external threat intelligence and ancillary tools:
+
+*   **Threat Intelligence Feeds**
+
+    *   **ISC IP Threat Intel** and **Rosti Threat Intel:** Public feeds of known malicious IP addresses.
+    *   **VirusTotal API:** Checks file hashes (from Cowrie honeypot) against a global malware database.
+
+*   **Sensor and Network Tools**
+
+    *   **Cowrie Honeypot** (SSH/Telnet) and **Webhoneypot:** Generate attack logs for analysis.
+    *   **Zeek (Bro):** Network security monitor that produces detailed flow and protocol logs.
+    *   **iptables:** Captures firewall events at the network edge.
+    *   **Arkime (optional):** Full-packet capture system that can be integrated for deeper forensic data.
+
+These integrations allow DShield-SIEM to spot known threats quickly and add context to every log entry.
+
+## 5. Security and Performance Considerations
+
+We’ve built in measures to protect data and keep the system responsive:
+
+*   **Security Measures**
+
+    *   **TLS Encryption** for all communication between Beats, Logstash, and Elasticsearch.
+    *   **Role-Based Access Control (RBAC)** in Elasticsearch/Kibana to restrict who can view or change data.
+    *   **Secret Management** scripts that support backends like 1Password or HashiCorp Vault for safe credential storage.
+
+*   **Performance Optimizations**
+
+    *   **Index Lifecycle Management (ILM):** Automatically rolls over daily indices, moves older data to cheaper storage, and deletes it after retention periods.
+    *   **Pre-compiled Grok Patterns & Filters:** Reduces parsing overhead in Logstash.
+    *   **Horizontal Scalability:** Add more Elasticsearch nodes when data volume grows.
+    *   **Monitoring Beats (Metricbeat, Heartbeat):** Keep an eye on system health and restart components if they fail.
+
+These design choices ensure that the SIEM remains secure, scalable, and fast even as log volumes increase.
+
+## 6. Conclusion and Overall Tech Stack Summary
+
+DShield-SIEM combines open-source tools in a cohesive way to deliver a turnkey security monitoring solution:
+
+*   **Frontend:** Kibana provides an intuitive UI for dashboards, searches, and alerts.
+*   **Backend:** Elasticsearch for storage, Logstash for parsing/enrichment, and Beats/Elastic Agent for reliable data collection.
+*   **Infrastructure:** Docker containers, Git version control, and optional CI/CD pipelines for consistent deployments.
+*   **Integrations:** External threat intel feeds (ISC, Rosti, VirusTotal) and sensor data sources (Cowrie, Zeek, iptables).
+*   **Security & Performance:** TLS encryption, RBAC, ILM policies, and monitoring to keep the system safe and responsive.
+
+This carefully selected tech stack aligns with the project’s goal of delivering a robust, scalable, and user-friendly SIEM platform that empowers security analysts to detect and respond to threats faster.

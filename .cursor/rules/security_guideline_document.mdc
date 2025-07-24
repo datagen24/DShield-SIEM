@@ -1,0 +1,124 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# DShield-SIEM Security Guidelines
+
+This document outlines mandatory security controls and best practices for the design, deployment, and operation of the DShield-SIEM solution. Adherence to these principles ensures confidentiality, integrity, and availability of security logs, analytics, and the overall Elastic Stack.
+
+## 1. Security by Design & Governance
+
+*   Embed security reviews in every phase: requirements, design, implementation, testing, deployment.
+*   Maintain an up-to-date threat model describing potential risks (e.g., malicious log injection, unauthorized access, DoS).
+*   Define clear security ownership and incident response roles for SIEM operators and devops teams.
+
+## 2. Least Privilege & Role-Based Access Control (RBAC)
+
+*   **Elasticsearch & Kibana:**\
+    • Create dedicated service accounts (e.g., `beats_writer`, `logstash_writer`) with index-write only on specific indices.\
+    • Define Kibana roles (e.g., `analyst`, `admin`, `readonly`) restricting dashboard and alert management by necessity.
+*   **Logstash & Beats:**\
+    • Each Beat (Filebeat, Metricbeat, Heartbeat, Elastic Agent) must authenticate with unique, minimal-scope credentials.\
+    • Avoid shared credentials across data collectors.
+
+## 3. Strong Authentication & Session Security
+
+*   Enforce Elasticsearch native or SSO authentication with MFA for all human users.
+*   JWT (if used) must: use HS256/RS256, validate `exp`, `iss`, `aud`; rotate signing keys periodically.
+*   Configure Kibana sessions with:\
+    • `xpack.security.session.idleTimeout` (e.g., 30 minutes)\
+    • `xpack.security.session.lifespan` (e.g., 8 hours)\
+    • HttpOnly, Secure, SameSite=Strict cookies.
+
+## 4. Data in Transit & at Rest Encryption
+
+*   **Transport Layer Security:**\
+    • Enable TLS 1.2+ for all HTTP and inter-node communication.\
+    • Use certificates managed via Vault or a PKI; disable self-signed certs in production.
+*   **At-Rest Encryption:**\
+    • Encrypt Elasticsearch data volumes using LUKS or cloud-native encryption.\
+    • Secure Docker volume mounts with restrictive file system permissions (600/700).
+
+## 5. Input Validation & Log Processing Hardening
+
+*   Treat all incoming logs as untrusted.
+*   In Logstash pipelines:\
+    • Apply Grok patterns with strict anchors to prevent ReDoS.\
+    • Use `mutate` filters to drop unexpected fields.\
+    • Whitelist permitted event types; drop or tag anomalous messages.
+*   Sanitize any user-supplied fields before passing them to Kibana scripted fields or Elasticsearch painless scripts.
+
+## 6. Secure Defaults & Configuration Management
+
+*   Ship Beats and Logstash with security features enabled by default: SSL/TLS, Basic Auth.
+*   In `docker-compose.yml` and config files (`.yml`, `.conf`):\
+    • Avoid hard-coding secrets; inject via environment variables fetched securely (e.g., HashiCorp Vault).\
+    • Use lockfiles (`yarn.lock`, `Pipfile.lock`) for deterministic dependency versions.
+
+## 7. Container & Host Hardening
+
+*   Run containers as non-root whenever possible (`user: "1000:1000"`).
+*   Limit container capabilities (drop all by default, add only NET_BIND_SERVICE if necessary).
+*   Restrict exposed ports: Beats → 5044 only on internal networks; Kibana → 5601 limited to authorized CIDR.
+*   Keep host OS and Docker Engine patched; disable unused kernel modules and services.
+
+## 8. Secure API & CORS Policies
+
+*   Restrict Kibana CORS to trusted origins:\
+    `server.host: "0.0.0.0"`,\
+    `server.cors.allowOrigins: ["https://siem.company.local"]`
+*   Enforce HTTPS and HSTS (`Strict-Transport-Security`) on the Kibana reverse proxy.
+
+## 9. Security Headers & Browser Hardening
+
+*   Configure the reverse proxy (NGINX/Apache) fronting Kibana to send:\
+    • `Content-Security-Policy: default-src 'self';`\
+    • `X-Content-Type-Options: nosniff`\
+    • `X-Frame-Options: DENY`\
+    • `Referrer-Policy: no-referrer-when-downgrade`
+
+## 10. Secret Management
+
+*   Store API keys (ISC, Rosti, VirusTotal), SSL certificates, Users and passwords, and Elasticsearch passwords in a secret store (Vault, AWS Secrets Manager, Azure Key Vault, 1Password).
+
+    *   Use of a modular configurable backend should be used to allow this to be portable to multiple environments
+
+*   Rotate credentials on a scheduled basis.
+
+*   Ensure CI/CD pipelines fetch secrets at runtime—never check them into Git.
+
+## 11. Monitoring, Auditing & Alerting
+
+*   **Audit Logs:**\
+    • Enable Elasticsearch auditing for authentication, configuration changes, and index-level operations.\
+    • Store audit indices separately with stricter retention.
+*   **Beats & Host Metrics:**\
+    • Monitor host integrity (Filebeat syslog, auditd) and container performance (Metricbeat Docker module).
+*   **Alerting:**\
+    • Define alerts for unusual spikes in parsing errors, high latencies, or authentication failures.\
+    • Integrate SIEM health alerts into PagerDuty or Slack for 24x7 visibility.
+
+## 12. Backup & Disaster Recovery
+
+*   Regularly snapshot Elasticsearch indices to secure object storage (AWS S3, GCS) with encryption.
+*   Store Kibana saved objects (dashboards, index patterns) as NDJSON in version control.
+*   Test restore procedures quarterly.
+
+## 13. Dependency & Vulnerability Management
+
+*   Use SCA tools (e.g., OWASP Dependency-Check, Trivy) in CI to scan Docker images and pipeline code.
+*   Subscribe to Elastic Stack security advisories; apply patches within defined SLAs.
+*   Keep third-party Logstash plugins to a minimum; monitor their CVE status.
+
+## 14. Incident Response & Forensics
+
+*   Maintain runbooks covering:\
+    • SIEM component compromise (e.g., Elastic exploit).\
+    • Log integrity verification (checksums, Elasticsearch index‐level replication).\
+    • Data exfiltration detection (unusual export of NDJSON or dashboards).
+*   Preserve forensic snapshots of compromised containers or volumes in air-gapped storage before remediation.
+
+By following these guidelines, DShield-SIEM will maintain a hard security posture, resilient to modern threats while providing security analysts with a trusted platform for real-time threat detection and response.
