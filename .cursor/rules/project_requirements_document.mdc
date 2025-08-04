@@ -9,7 +9,7 @@ Update this rule if user requested changes to the project requirement, etc.
 
 ## 1. Project Overview
 
-DShield-SIEM is a specialized Security Information and Event Management system built on the Elastic Stack (Elasticsearch, Logstash, Kibana, Beats). Its core purpose is to collect, parse, enrich, store, and visualize security logs—especially from DShield sensors like Cowrie honeypots, webhoneypots, firewall (iptables), and Zeek network monitors. By unifying diverse log types and integrating external threat intelligence feeds (ISC, Rosti, VirusTotal), it helps security analysts detect, investigate, and respond to incidents faster.
+DShield-SIEM is a specialized Security Information and Event Management system built on the Elastic Stack (Elasticsearch, Logstash, Kibana, Beats). Its core purpose is to collect, parse, enrich, store, and visualize security logs—especially from DShield sensors which include Cowrie honeypots, webhoneypots, firewall (iptables), and Zeek network monitors. By unifying diverse log types and integrating external threat intelligence feeds (ISC, Rosti, VirusTotal), it helps security analysts detect, investigate, and respond to incidents faster.
 
 This system is being built to give incident responders and network administrators a turnkey solution for threat hunting and real-time alerting. Success will be measured by:
 
@@ -34,15 +34,21 @@ This system is being built to give incident responders and network administrator
 *   Secret storage using a modular secret backend (1Password, Hashicorp Vault, Azure Key Vault, etc.)
 *   Bulk Data load from pre-existing sensors, or for Disaster recovery, must be able to date ingested events properly
 
-**Out-of-Scope (Phase 2+):**
+** In-Scope (Version 2.0)**
 
-*   iPhone push notifications
+*   High-availability Elasticsearch setups, using K8s/K3s
+*   Deep integration with dsheild-mcp ([https://github.com/datagen24/dsheild-mcp](https://github.com/datagen24/dsheild-mcp/issues)) 
+*   Custom machine learning anomaly detection via integration with dshield-coordination-engine 
+*   Connection with public or Private MISP servers for threat Analysis
+*   Automated setup of honeypots
+
+**Out-of-Scope (Phase 3+):**
+
+*   iPhone push notifications for interesting events
 *   User management beyond Elasticsearch native roles, to allow collective research
 *   Deep packet capture storage (Arkime integration only documented, not baked in) or security onion collection from the multitude of sensors
-*   Multi-cluster or high-availability Elasticsearch setups
-*   Potential port to allow this to work on Elastic Cloud to handle higher data volumes
-*   Custom machine learning anomaly detection (beyond simple thresholds)
-*   Deep integration with dsheild-mcp ([https://github.com/datagen24/dsheild-mcp](https://github.com/datagen24/dsheild-mcp/issues))
+*   Potential port to allow this to work on Elastic Cloud to support enterprise features
+*   Logstash Pipelines managed in Elastic
 *   Integration of other honeypot systems, with cross-enrichment
 
 ## 3. User Flow
